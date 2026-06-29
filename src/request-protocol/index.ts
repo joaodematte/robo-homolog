@@ -35,6 +35,7 @@ export async function runRequestProtocol() {
 
   console.log(`Encontrados ${projects.length} projetos para automação.`);
   console.table(
+    // oxlint-disable-next-line sort-keys
     projects.map(({ cidadeInstalacao, cliente, concessionaria, projeto }) => ({
       projeto,
       cliente,

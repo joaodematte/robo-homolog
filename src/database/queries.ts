@@ -102,3 +102,36 @@ export function getColetaDadosByUnidadeConsumidora(unidadeConsumidora: string) {
     .leftJoin(clientes, eq(coletaDados.clienteColeta, clientes.idCliente))
     .where(eq(coletaDados.ucPrincipalColeta, unidadeConsumidora));
 }
+
+export function listOpenProtocolProjectsByClientNames(clientNames: string[]) {
+  const names = clientNames
+    .map((clientName) => clientName.trim())
+    .filter(Boolean);
+
+  if (names.length === 0) {
+    return [];
+  }
+
+  return db
+    .select({
+      idColeta: coletaDados.idColeta,
+      nomeCliente: clientes.nomeCliente,
+    })
+    .from(etapas)
+    .leftJoin(coletaDados, eq(coletaDados.idColeta, etapas.codColetaEtapa))
+    .leftJoin(clientes, eq(clientes.idCliente, coletaDados.clienteColeta))
+    .where(
+      and(
+        eq(etapas.codCfgEtapa, 42),
+        isNull(etapas.datahoraConclusaoEtapa),
+        eq(etapas.statusEtapa, 0),
+        eq(coletaDados.statusColeta, 2),
+        eq(etapas.bloqueadaEtapa, 0),
+        or(
+          ...names.map((clientName) =>
+            like(clientes.nomeCliente, `%${clientName}%`)
+          )
+        )
+      )
+    );
+}

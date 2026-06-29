@@ -18,6 +18,7 @@ const SELECTORS = {
   closeModalEtapa: "#fecharModalEtapa",
   coletaFiltro: "#coleta_filtro",
   coletaFiltroLoading: "#div_coleta_filtro_carregando",
+  dataEtapa: 'input[name="data"]',
   etapaSolicitacaoProtocoloText: "#etapa-42 .etapa-text",
   modalEtapa: "#ModalEtapa",
   observacao: "textarea[name='observacao']",
@@ -104,14 +105,20 @@ async function openRequestProtocolModal(page: Page, _project: Project) {
   await page.getByRole("button", { name: "Salvar Registros" }).waitFor();
 }
 
+function buildCurrentDateText() {
+  return new Intl.DateTimeFormat("pt-BR").format(new Date());
+}
+
 function buildProtocoloSolicitadoText() {
-  const currentDate = new Intl.DateTimeFormat("pt-BR").format(new Date());
-  return `${currentDate} - ${PROTOCOLO_SOLICITADO_LABEL}`;
+  return `${buildCurrentDateText()} - ${PROTOCOLO_SOLICITADO_LABEL}`;
 }
 
 // Preenche a observação com a data da solicitação de protocolo
 async function fillRequestProtocolModal(page: Page) {
+  const dataEtapa = page.locator(SELECTORS.dataEtapa);
   const observacao = page.locator(SELECTORS.observacao);
+
+  await dataEtapa.fill(buildCurrentDateText());
 
   const protocoloSolicitadoText = buildProtocoloSolicitadoText();
   const currentObservacao = await observacao.inputValue();
