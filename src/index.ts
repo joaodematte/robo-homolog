@@ -6,8 +6,8 @@ import { validateProtocolReturn } from "./validate-protocol-return";
 
 async function askAutomationChoice() {
   console.log("Qual automação você deseja iniciar?");
-  console.log("1️⃣ - Solicitação de Protocolo");
-  console.log("2️⃣ - Retorno de Protocolo");
+  console.log("1 - Solicitação de Protocolo");
+  console.log("2 - Retorno de Protocolo");
 
   const readlineInterface = readline.createInterface({ input, output });
 

@@ -90,10 +90,6 @@ async function selectProject(page: Page, project: Project) {
   );
 
   await page.getByRole("button", { name: "Filtrar" }).click();
-
-  console.log(
-    `⚠️ Projeto selecionado no sistema:\t${project.projeto} - ${project.cliente}`
-  );
 }
 
 // Abre o modal da etapa "Solicitação de Protocolo"
@@ -135,21 +131,6 @@ async function saveRequestProtocolStep(page: Page, _project: Project) {
   await page.getByRole("button", { name: "Salvar Registros" }).click();
 
   await page.locator(SELECTORS.swalConfirmButton).waitFor();
-}
-
-async function closeEtapaSalvaModal(page: Page) {
-  const swalContainer = page.locator(SELECTORS.swalContainer);
-
-  await page.locator(SELECTORS.swalConfirmButton).click();
-
-  await swalContainer.waitFor({ state: "hidden" });
-}
-
-async function closeRequestProtocolModal(page: Page) {
-  const modalEtapa = page.locator(SELECTORS.modalEtapa);
-
-  await page.locator(SELECTORS.closeModalEtapa).click();
-  await modalEtapa.waitFor({ state: "hidden" });
 }
 
 async function closeBrowserSafely(
@@ -203,8 +184,6 @@ async function runTopsunProjectAttempt(
     await openRequestProtocolModal(page, project);
     await fillRequestProtocolModal(page);
     await saveRequestProtocolStep(page, project);
-    await closeEtapaSalvaModal(page);
-    await closeRequestProtocolModal(page);
 
     console.log(
       `✅ Protocolo registrado na Topsun:\t${project.projeto} - ${project.cliente}`
