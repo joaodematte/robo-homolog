@@ -100,10 +100,9 @@ async function shouldProceedWithProjects() {
   }
 }
 
-async function closeBrowserSafely(
+async function closeContextSafely(
   page: Page | undefined,
-  context: BrowserContext | undefined,
-  browser: Browser | undefined
+  context: BrowserContext | undefined
 ) {
   const closePromise = async () => {
     try {
@@ -116,12 +115,6 @@ async function closeBrowserSafely(
       await context?.close();
     } catch {
       // Ignora falha ao fechar o contexto
-    }
-
-    try {
-      await browser?.close();
-    } catch {
-      // Ignora falha ao fechar o browser
     }
   };
 
@@ -368,9 +361,9 @@ async function saveRequestProtocolStep(page: Page) {
 }
 
 async function runCloseEtapaAttempt(
+  browser: Browser,
   project: OpenProjectWithProtocol
 ): Promise<boolean> {
-  let browser: Browser | undefined;
   let context: BrowserContext | undefined;
   let page: Page | undefined;
 
@@ -379,10 +372,6 @@ async function runCloseEtapaAttempt(
   }
 
   try {
-    browser = await chromium.launch({
-      args: ["--disable-dev-shm-usage"],
-      headless: true,
-    });
     context = await browser.newContext();
     page = await context.newPage();
 
@@ -414,11 +403,12 @@ async function runCloseEtapaAttempt(
 
     return false;
   } finally {
-    await closeBrowserSafely(page, context, browser);
+    await closeContextSafely(page, context);
   }
 }
 
 async function closeEtapaOnTopsunWithRetry(
+  browser: Browser,
   project: OpenProjectWithProtocol,
   attempt = 1
 ): Promise<boolean> {
@@ -428,16 +418,17 @@ async function closeEtapaOnTopsunWithRetry(
     );
   }
 
-  const succeeded = await runCloseEtapaAttempt(project);
+  const succeeded = await runCloseEtapaAttempt(browser, project);
 
   if (succeeded || attempt >= MAX_PROJECT_ATTEMPTS) {
     return succeeded;
   }
 
-  return closeEtapaOnTopsunWithRetry(project, attempt + 1);
+  return closeEtapaOnTopsunWithRetry(browser, project, attempt + 1);
 }
 
 async function processProtocolReturnsWithConcurrency(
+  browser: Browser,
   projects: OpenProjectWithProtocol[],
   concurrency: number
 ) {
@@ -461,7 +452,10 @@ async function processProtocolReturnsWithConcurrency(
       );
 
       try {
-        results[currentIndex] = await closeEtapaOnTopsunWithRetry(project);
+        results[currentIndex] = await closeEtapaOnTopsunWithRetry(
+          browser,
+          project
+        );
       } catch (error) {
         console.error(
           `❌ Erro inesperado no worker de retorno de protocolo:\t${project.idColeta} - ${project.nomeCliente}`,
@@ -479,7 +473,10 @@ async function processProtocolReturnsWithConcurrency(
   return results;
 }
 
-function closeProtocolReturnsOnTopsun(projects: OpenProjectWithProtocol[]) {
+function closeProtocolReturnsOnTopsun(
+  browser: Browser,
+  projects: OpenProjectWithProtocol[]
+) {
   if (projects.length === 0) {
     return Promise.resolve([]);
   }
@@ -490,7 +487,7 @@ function closeProtocolReturnsOnTopsun(projects: OpenProjectWithProtocol[]) {
     `\nProcessando ${projects.length} retorno(s) de protocolo na Topsun com concorrência ${concurrency}\n`
   );
 
-  return processProtocolReturnsWithConcurrency(projects, concurrency);
+  return processProtocolReturnsWithConcurrency(browser, projects, concurrency);
 }
 
 export async function validateProtocolReturn() {
@@ -633,7 +630,16 @@ export async function validateProtocolReturn() {
     process.exit(0);
   }
 
-  await closeProtocolReturnsOnTopsun(openProjectsWithProtocol);
+  const browser = await chromium.launch({
+    args: ["--disable-dev-shm-usage"],
+    headless: true,
+  });
+
+  try {
+    await closeProtocolReturnsOnTopsun(browser, openProjectsWithProtocol);
+  } finally {
+    await browser.close();
+  }
 
   process.exit(0);
 }

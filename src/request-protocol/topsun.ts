@@ -1,4 +1,3 @@
-import { chromium } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import type { Project } from ".";
@@ -140,10 +139,9 @@ async function saveRequestProtocolStep(page: Page, _project: Project) {
   await page.locator(SELECTORS.swalConfirmButton).waitFor();
 }
 
-async function closeBrowserSafely(
+async function closeContextSafely(
   page: Page | undefined,
-  context: BrowserContext | undefined,
-  browser: Browser | undefined
+  context: BrowserContext | undefined
 ) {
   const closePromise = async () => {
     try {
@@ -157,29 +155,19 @@ async function closeBrowserSafely(
     } catch {
       // Ignora falha ao fechar o contexto
     }
-
-    try {
-      await browser?.close();
-    } catch {
-      // Ignora falha ao fechar o browser
-    }
   };
 
   await Promise.race([closePromise(), Bun.sleep(BROWSER_CLOSE_TIMEOUT_MS)]);
 }
 
 async function runTopsunProjectAttempt(
+  browser: Browser,
   project: Project
 ): Promise<ProtocolResult> {
-  let browser: Browser | undefined;
   let context: BrowserContext | undefined;
   let page: Page | undefined;
 
   try {
-    browser = await chromium.launch({
-      args: ["--disable-dev-shm-usage"],
-      headless: true,
-    });
     context = await browser.newContext();
     page = await context.newPage();
 
@@ -204,11 +192,12 @@ async function runTopsunProjectAttempt(
 
     return createErroredProtocolResult(project, error);
   } finally {
-    await closeBrowserSafely(page, context, browser);
+    await closeContextSafely(page, context);
   }
 }
 
 async function requestProtocolOnNewTopsunProject(
+  browser: Browser,
   project: Project,
   attempt = 1
 ): Promise<ProtocolResult> {
@@ -218,16 +207,17 @@ async function requestProtocolOnNewTopsunProject(
     );
   }
 
-  const result = await runTopsunProjectAttempt(project);
+  const result = await runTopsunProjectAttempt(browser, project);
 
   if (result.status === "SUCCEEDED" || attempt >= MAX_PROJECT_ATTEMPTS) {
     return result;
   }
 
-  return requestProtocolOnNewTopsunProject(project, attempt + 1);
+  return requestProtocolOnNewTopsunProject(browser, project, attempt + 1);
 }
 
 async function processProjectsWithConcurrency(
+  browser: Browser,
   projects: Project[],
   concurrency: number
 ) {
@@ -251,8 +241,10 @@ async function processProjectsWithConcurrency(
       );
 
       try {
-        results[currentIndex] =
-          await requestProtocolOnNewTopsunProject(project);
+        results[currentIndex] = await requestProtocolOnNewTopsunProject(
+          browser,
+          project
+        );
       } catch (error) {
         console.error(
           `❌ Erro inesperado no worker da Topsun:\t${project.projeto} - ${project.cliente}`,
@@ -270,7 +262,10 @@ async function processProjectsWithConcurrency(
   return results;
 }
 
-export function requestProtocolOnNewTopsun(projects: Project[]) {
+export function requestProtocolOnNewTopsun(
+  browser: Browser,
+  projects: Project[]
+) {
   if (projects.length === 0) {
     return Promise.resolve([]);
   }
@@ -281,5 +276,5 @@ export function requestProtocolOnNewTopsun(projects: Project[]) {
     `\nProcessando ${projects.length} projeto(s) na Topsun com concorrência ${concurrency}\n`
   );
 
-  return processProjectsWithConcurrency(projects, concurrency);
+  return processProjectsWithConcurrency(browser, projects, concurrency);
 }

@@ -1,5 +1,4 @@
-import { chromium } from "@playwright/test";
-import type { Locator, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 
 import type { Project } from ".";
 
@@ -242,14 +241,17 @@ async function waitForSuccessMessage(page: Page) {
   await page.getByText("Sua resposta foi enviada").waitFor();
 }
 
-export async function requestProtocolOnNewCelesc(project: Project) {
-  const browser = await chromium.launch({ headless: true });
+export async function requestProtocolOnNewCelesc(
+  browser: Browser,
+  project: Project
+) {
   const context = await browser.newContext();
-  const page = await context.newPage();
-
-  page.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
 
   try {
+    const page = await context.newPage();
+
+    page.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
+
     await page.goto(process.env.REQUEST_PROTOCOL_URL ?? "");
     await waitForAnyInputToBeVisible(page);
 
@@ -278,6 +280,6 @@ export async function requestProtocolOnNewCelesc(project: Project) {
 
     return false;
   } finally {
-    await browser.close();
+    await context.close();
   }
 }

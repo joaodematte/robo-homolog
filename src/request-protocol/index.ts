@@ -1,6 +1,8 @@
 import { stdin as input, stdout as output } from "node:process";
 import * as readline from "node:readline/promises";
 
+import { chromium } from "@playwright/test";
+
 import { listRequestProtocolProjects } from "../database/queries";
 import { requestProtocolOnNewCelesc } from "./celesc";
 import {
@@ -51,47 +53,59 @@ export async function runRequestProtocol() {
     process.exit(0);
   }
 
-  const celescResults = await Promise.all(
-    projects.map(async (project): Promise<ProtocolResult> => {
-      const succeeded = await requestProtocolOnNewCelesc(project);
-
-      if (succeeded) {
-        return createSucceededProtocolResult(project);
-      }
-
-      return {
-        errorMessage: "Erro ao solicitar protocolo na CELESC.",
-        project,
-        status: "ERRORED",
-      };
-    })
-  );
-
-  await createSystemProtocolReport({
-    outputPath: "logs/celesc-report.xlsx",
-    results: celescResults,
-    system: "CELESC",
+  const browser = await chromium.launch({
+    args: ["--disable-dev-shm-usage"],
+    headless: true,
   });
 
-  const succeededProjects = celescResults.flatMap(({ project, status }) =>
-    status === "SUCCEEDED" ? [project] : []
-  );
+  try {
+    const celescResults = await Promise.all(
+      projects.map(async (project): Promise<ProtocolResult> => {
+        const succeeded = await requestProtocolOnNewCelesc(browser, project);
 
-  console.log(
-    `\n${succeededProjects.length} protocolo(s) solicitado(s) com sucesso na CELESC\n`
-  );
+        if (succeeded) {
+          return createSucceededProtocolResult(project);
+        }
 
-  const topsunResults = await requestProtocolOnNewTopsun(succeededProjects);
+        return {
+          errorMessage: "Erro ao solicitar protocolo na CELESC.",
+          project,
+          status: "ERRORED",
+        };
+      })
+    );
 
-  await createSystemProtocolReport({
-    outputPath: "logs/topsun-report.xlsx",
-    results: topsunResults,
-    system: "TOPSUN",
-  });
+    await createSystemProtocolReport({
+      outputPath: "logs/celesc-report.xlsx",
+      results: celescResults,
+      system: "CELESC",
+    });
 
-  console.log(
-    "\nRelatórios gerados em logs/celesc-report.xlsx e logs/topsun-report.xlsx\n"
-  );
+    const succeededProjects = celescResults.flatMap(({ project, status }) =>
+      status === "SUCCEEDED" ? [project] : []
+    );
+
+    console.log(
+      `\n${succeededProjects.length} protocolo(s) solicitado(s) com sucesso na CELESC\n`
+    );
+
+    const topsunResults = await requestProtocolOnNewTopsun(
+      browser,
+      succeededProjects
+    );
+
+    await createSystemProtocolReport({
+      outputPath: "logs/topsun-report.xlsx",
+      results: topsunResults,
+      system: "TOPSUN",
+    });
+
+    console.log(
+      "\nRelatórios gerados em logs/celesc-report.xlsx e logs/topsun-report.xlsx\n"
+    );
+  } finally {
+    await browser.close();
+  }
 
   process.exit(0);
 }
