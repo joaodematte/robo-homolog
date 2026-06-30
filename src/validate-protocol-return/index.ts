@@ -631,8 +631,8 @@ export async function validateProtocolReturn() {
   }
 
   const browser = await chromium.launch({
-    args: ["--disable-dev-shm-usage"],
-    headless: true,
+    executablePath: process.env.CHROME_PATH,
+    headless: false,
   });
 
   try {
